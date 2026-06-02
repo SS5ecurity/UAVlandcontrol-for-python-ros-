@@ -1,0 +1,369 @@
+/*
+ * style.css — 地面站主界面样式表
+ *
+ * 功能说明：
+ *     复现原 Qt LandScreen 界面的所有控件样式。
+ *     布局使用 CSS Flexbox 替代 QVBoxLayout / QHBoxLayout。
+ *
+ * 源码映射：
+ *     QLabel StyleSheet     → CSS 类 .f-label, .target-summary, .connect-status
+ *     QPushButton StyleSheet → CSS 类 .grid-btn, .action-btn, .info-btn
+ *     QPainter fillRect     → CSS Canvas / background-color
+ *     QWidget 大小         → CSS width/height/min-width/min-height
+ */
+
+/* ============================================================ */
+/* 全局样式 — 对应 Qt 全屏窗口 [原: homeWindow.showFullScreen()] */
+/* ============================================================ */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+html, body {
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    font-family: "Microsoft YaHei", "Arial", sans-serif;
+    background-color: #f5f5f5;
+}
+
+/* ============================================================ */
+/* 主容器 [原: QVBoxLayout *mainLayout，spacing: 10, margin: 10] */
+/* ============================================================ */
+.main-container {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    height: 100%;
+    padding: 10px;
+    gap: 10px;
+}
+
+/* ============================================================ */
+/* 上部区域 [原: topWidget → QHBoxLayout，AlignLeft | AlignTop] */
+/* ============================================================ */
+.top-section {
+    display: flex;
+    flex-direction: row;
+    align-items: flex-start;
+    gap: 10px;
+    flex-shrink: 0;
+}
+
+/* ============================================================ */
+/* 地图区域 [原: mapLabel fixedSize(360, 280)] */
+/* ============================================================ */
+.map-area {
+    position: relative;
+    width: 360px;
+    height: 280px;
+    flex-shrink: 0;
+    border: 1px solid #ccc;
+    background-color: #fff;
+}
+
+.map-area canvas {
+    display: block;
+    width: 360px;
+    height: 280px;
+}
+
+.map-placeholder {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    color: white;
+    background: black;
+    padding: 20px 40px;
+    border-radius: 5px;
+    display: none;
+}
+
+/* ============================================================ */
+/* 右上角面板 [原: rightTopWidget → QVBoxLayout，AlignTop | AlignRight] */
+/* ============================================================ */
+.right-panel {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+    padding: 10px;
+    flex: 1;
+    min-width: 200px;
+}
+
+/* ============================================================ */
+/* 禁飞区标签 F1/F2/F3 [原: labelF1/F2/F3 StyleSheet] */
+/* ============================================================ */
+.f-label {
+    background-color: #f8f8f8;
+    border: 1px solid #ccc;
+    border-radius: 3px;
+    padding: 5px;
+    font-size: 24px;
+    font-weight: bold;
+    color: #333;
+    min-height: 60px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+}
+
+/* ============================================================ */
+/* 按钮组 [原: buttonWidget → QHBoxLayout] */
+/* ============================================================ */
+.button-group {
+    display: flex;
+    flex-direction: row;
+    gap: 10px;
+    padding-top: 10px;
+}
+
+/* ============================================================ */
+/* 操作按钮通用样式 [原: QPushButton setMinimumSize(80, 40)] */
+/* ============================================================ */
+.action-btn {
+    flex: 1;
+    min-width: 80px;
+    min-height: 40px;
+    border-radius: 5px;
+    font-size: 16px;
+    font-weight: bold;
+    color: white;
+    border: none;
+    cursor: pointer;
+    transition: background-color 0.15s;
+}
+
+/* 发送按钮 [原: sendButton: 绿色 #28a745] */
+.send-btn {
+    background-color: #28a745;
+    border: 1px solid #1e7e34;
+}
+.send-btn:hover { background-color: #218838; }
+.send-btn:active { background-color: #1e7e34; }
+
+/* 取消按钮 [原: cancelButton: 红色 #dc3545] */
+.cancel-btn {
+    background-color: #dc3545;
+    border: 1px solid #c82333;
+}
+.cancel-btn:hover { background-color: #c82333; }
+.cancel-btn:active { background-color: #bd2130; }
+
+/* 启动按钮 [原: launchButton: 黄色 #dbdb18ff] */
+.launch-btn {
+    background-color: #c8c818;
+    border: 1px solid #b0b010;
+    color: white;
+}
+.launch-btn:hover { background-color: #b5b510; }
+.launch-btn:active { background-color: #1e7e34; }
+
+/* ============================================================ */
+/* 弹性空间 [原: mainLayout->addStretch()] */
+/* ============================================================ */
+.spacer {
+    flex: 1;
+    min-height: 10px;
+}
+
+/* ============================================================ */
+/* 下部区域 [原: bottomWidget → QVBoxLayout，AlignLeft | AlignBottom] */
+/* ============================================================ */
+.bottom-section {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+    flex-shrink: 0;
+}
+
+/* ============================================================ */
+/* 目标汇总行 [原: summaryLayout → QHBoxLayout] */
+/* ============================================================ */
+.summary-row {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 15px;
+}
+
+/* 目标汇总标签 [原: labelTargetSummary: font-size:18px, font-weight:bold, color:#333] */
+.target-summary {
+    font-size: 18px;
+    font-weight: bold;
+    color: #333;
+    flex: 1;
+}
+
+/* 连接状态标签 [原: connectStatusLabel: font-size:18px, font-weight:bold, color:#333] */
+.connect-status {
+    font-size: 18px;
+    font-weight: bold;
+    color: #333;
+}
+
+/* 显示目标信息按钮 [原: showTargetInfoButton: 蓝色 #007acc] */
+.info-btn {
+    min-width: 120px;
+    min-height: 40px;
+    background-color: #007acc;
+    color: white;
+    font-size: 16px;
+    font-weight: bold;
+    border-radius: 5px;
+    border: none;
+    cursor: pointer;
+    transition: background-color 0.15s;
+}
+.info-btn:hover { background-color: #005a99; }
+
+/* ============================================================ */
+/* 网格按钮行 [原: rowAWidget / rowBWidget → QHBoxLayout, spacing:8] */
+/* ============================================================ */
+.grid-row {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 8px;
+}
+
+/* 行标签 [原: labelA / labelB: font-weight:bold, font-size:16px, color:#333, min-size:40x40] */
+.row-label {
+    font-weight: bold;
+    font-size: 16px;
+    color: #333;
+    min-width: 40px;
+    min-height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* 网格按钮 [原: QPushButton buttonsA[i] / buttonsB[i]: min-size:40x40, white bg] */
+.grid-btn {
+    flex: 1;
+    min-width: 40px;
+    min-height: 40px;
+    background-color: #ffffff;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+    font-size: 14px;
+    font-weight: bold;
+    color: #333;
+    cursor: pointer;
+    transition: background-color 0.15s;
+}
+.grid-btn:hover { background-color: #e0e0e0; }
+.grid-btn:active { background-color: #d0d0d0; }
+
+/* 网格按钮选中状态 [原: buttonsA[i] 选中时蓝色背景 #007acc] */
+.grid-btn.selected {
+    background-color: #007acc;
+    border-color: #005a99;
+    color: white;
+    cursor: default;
+}
+
+/* 网格按钮禁用状态 [原: setEnabled(false)] */
+.grid-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+/* ============================================================ */
+/* 闪烁覆盖层 [原: Blink::paintEvent → fillRect(isLighted ? color : Qt::white)] */
+/* ============================================================ */
+#blinkOverlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 9999;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.1s;
+}
+#blinkOverlay.blink-on {
+    opacity: 1;
+    pointer-events: all;  /* 全屏闪烁时拦截点击 */
+}
+
+/* ============================================================ */
+/* 警告弹窗 [原: QMessageBox::warning] */
+/* ============================================================ */
+.alert-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.5);
+    z-index: 10000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.alert-overlay.hidden { display: none; }
+
+.alert-box {
+    background: white;
+    border-radius: 8px;
+    padding: 30px 40px;
+    min-width: 300px;
+    text-align: center;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+}
+
+.alert-title {
+    font-size: 20px;
+    font-weight: bold;
+    color: #333;
+    margin-bottom: 15px;
+}
+
+.alert-message {
+    font-size: 16px;
+    color: #555;
+    margin-bottom: 20px;
+}
+
+.alert-close-btn {
+    min-width: 80px;
+    min-height: 36px;
+    background-color: #007acc;
+    color: white;
+    font-size: 14px;
+    font-weight: bold;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+}
+.alert-close-btn:hover { background-color: #005a99; }
+
+/* ============================================================ */
+/* 响应式适配 */
+/* ============================================================ */
+@media (max-width: 800px) {
+    .top-section {
+        flex-direction: column;
+    }
+    .map-area, .map-area canvas {
+        width: 100%;
+        height: auto;
+        max-height: 280px;
+    }
+    .right-panel {
+        flex-direction: row;
+        flex-wrap: wrap;
+    }
+    .f-label {
+        font-size: 18px;
+        min-height: 40px;
+    }
+}

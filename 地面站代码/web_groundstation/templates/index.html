@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<!--
+    index.html — 地面站主界面
+
+    功能说明：
+        完整复现原 Qt LandScreen 界面布局，包括：
+        - 地图显示区域（Canvas 绘制）
+        - 禁飞区标签 F1/F2/F3
+        - 发送/取消/启动按钮
+        - 网格按钮 A1~A9, B1~B7
+        - 目标汇总标签 & 连接状态
+        - 全屏闪烁告警
+
+    源码映射：
+        原 C++ 文件: landScreen.cpp (CreateUI 方法)
+        QVBoxLayout 主布局 → CSS Flexbox 布局
+        QLabel mapLabel → <canvas id="mapCanvas">
+        QLabel labelF1/F2/F3 → <div id="labelF1/F2/F3">
+        QPushButton buttonsA/B → <button class="grid-btn">
+        QPushButton sendButton → <button id="sendButton">
+        QPushButton cancelButton → <button id="cancelButton">
+        QPushButton launchButton → <button id="launchButton">
+        QLabel labelTargetSummary → <span id="labelTargetSummary">
+        QLabel connectStatusLabel → <span id="connectStatusLabel">
+        Blink paintEvent → <div id="blinkOverlay">
+-->
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>地图界面</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+
+    <!-- ============================================================ -->
+    <!-- 闪烁告警覆盖层 [原: Blink::paintEvent] -->
+    <!-- ============================================================ -->
+    <div id="blinkOverlay"></div>
+
+    <!-- ============================================================ -->
+    <!-- 主容器 [原: mainLayout = QVBoxLayout] -->
+    <!-- ============================================================ -->
+    <div class="main-container">
+
+        <!-- ======================================================== -->
+        <!-- 上部区域：地图 + 右侧面板 [原: topWidget → QHBoxLayout] -->
+        <!-- ======================================================== -->
+        <div class="top-section">
+
+            <!-- ==================================================== -->
+            <!-- 地图显示区域 [原: mapLabel = QLabel] -->
+            <!-- 原 Qt: mapLabel->setFixedSize(360, 280) -->
+            <!-- ==================================================== -->
+            <div class="map-area">
+                <canvas id="mapCanvas" width="360" height="280"></canvas>
+                <div id="mapPlaceholder" class="map-placeholder">
+                    地图加载中...
+                </div>
+            </div>
+
+            <!-- ==================================================== -->
+            <!-- 右上角面板 [原: rightTopWidget → QVBoxLayout] -->
+            <!-- ==================================================== -->
+            <div class="right-panel">
+
+                <!-- 禁飞区标签 F1 [原: labelF1 = QLabel("NULL")] -->
+                <div id="labelF1" class="f-label">NULL</div>
+
+                <!-- 禁飞区标签 F2 [原: labelF2 = QLabel("NULL")] -->
+                <div id="labelF2" class="f-label">NULL</div>
+
+                <!-- 禁飞区标签 F3 [原: labelF3 = QLabel("NULL")] -->
+                <div id="labelF3" class="f-label">NULL</div>
+
+                <!-- 按钮组 [原: buttonWidget → QHBoxLayout] -->
+                <div class="button-group">
+
+                    <!-- 发送按钮 [原: sendButton = QPushButton("发送")] -->
+                    <button id="sendButton" class="action-btn send-btn">发送</button>
+
+                    <!-- 取消按钮 [原: cancelButton = QPushButton("取消")] -->
+                    <button id="cancelButton" class="action-btn cancel-btn">取消</button>
+
+                    <!-- 启动按钮 [原: launchButton = QPushButton("启动")] -->
+                    <button id="launchButton" class="action-btn launch-btn">启动</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- ======================================================== -->
+        <!-- 中部弹性空间 [原: mainLayout->addStretch()] -->
+        <!-- ======================================================== -->
+        <div class="spacer"></div>
+
+        <!-- ======================================================== -->
+        <!-- 下部区域：网格按钮 [原: bottomWidget → QVBoxLayout] -->
+        <!-- ======================================================== -->
+        <div class="bottom-section">
+
+            <!-- 目标汇总 & 连接状态行 [原: summaryLayout → QHBoxLayout] -->
+            <div class="summary-row">
+
+                <!-- 目标汇总标签 [原: labelTargetSummary = QLabel("暂无目标信息")] -->
+                <span id="labelTargetSummary" class="target-summary">暂无目标信息</span>
+
+                <!-- 连接状态标签 [原: connectStatusLabel = QLabel("未连接")] -->
+                <span id="connectStatusLabel" class="connect-status">未连接</span>
+
+                <!-- 显示目标信息按钮 [原: showTargetInfoButton = QPushButton("显示目标信息")] -->
+                <button id="showTargetInfoButton" class="info-btn">显示目标信息</button>
+            </div>
+
+            <!-- A 行按钮 [原: rowAWidget → QHBoxLayout] -->
+            <div class="grid-row">
+                <!-- 标签 A [原: labelA = QLabel("A")] -->
+                <span class="row-label">A</span>
+
+                <!-- buttonsA[0]~[8] [原: QPushButton *buttonsA[9]] -->
+                <button class="grid-btn btn-a" data-index="0">1</button>
+                <button class="grid-btn btn-a" data-index="1">2</button>
+                <button class="grid-btn btn-a" data-index="2">3</button>
+                <button class="grid-btn btn-a" data-index="3">4</button>
+                <button class="grid-btn btn-a" data-index="4">5</button>
+                <button class="grid-btn btn-a" data-index="5">6</button>
+                <button class="grid-btn btn-a" data-index="6">7</button>
+                <button class="grid-btn btn-a" data-index="7">8</button>
+                <button class="grid-btn btn-a" data-index="8">9</button>
+            </div>
+
+            <!-- B 行按钮 [原: rowBWidget → QHBoxLayout] -->
+            <div class="grid-row">
+                <!-- 标签 B [原: labelB = QLabel("B")] -->
+                <span class="row-label">B</span>
+
+                <!-- buttonsB[0]~[6] [原: QPushButton *buttonsB[7]] -->
+                <button class="grid-btn btn-b" data-index="0">1</button>
+                <button class="grid-btn btn-b" data-index="1">2</button>
+                <button class="grid-btn btn-b" data-index="2">3</button>
+                <button class="grid-btn btn-b" data-index="3">4</button>
+                <button class="grid-btn btn-b" data-index="4">5</button>
+                <button class="grid-btn btn-b" data-index="5">6</button>
+                <button class="grid-btn btn-b" data-index="6">7</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- 警告弹窗 [原: QMessageBox::warning] -->
+    <!-- ============================================================ -->
+    <div id="alertOverlay" class="alert-overlay hidden">
+        <div class="alert-box">
+            <div id="alertTitle" class="alert-title">警告</div>
+            <div id="alertMessage" class="alert-message"></div>
+            <button id="alertClose" class="alert-close-btn">确定</button>
+        </div>
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- JavaScript -->
+    <!-- ============================================================ -->
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+    <script src="/static/script.js"></script>
+</body>
+</html>

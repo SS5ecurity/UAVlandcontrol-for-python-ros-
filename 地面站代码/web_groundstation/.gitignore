@@ -1,0 +1,21 @@
+# Python 相关
+__pycache__/
+*.pyc
+*.pyo
+
+# 运行时文件
+log.txt
+
+# IDE 相关
+.vscode/
+.idea/
+
+# 虚拟环境
+venv/
+env/
+.venv/
+
+# 临时文件
+*.swp
+*.tmp
+.DS_Store

@@ -1,0 +1,471 @@
+<!DOCTYPE html>
+<!--
+    target_info.html — 目标信息页面
+
+    功能说明：
+        完整复现原 Qt TargetInfo 对话框的功能：
+        - 显示所有已检测到的目标列表（名称、A、B、N值）
+        - 分类统计各类型目标的总数
+        - 救援按钮选择目标
+
+    源码映射：
+        原 C++ 文件: TargetInfo.h + TargetInfo.cpp
+        QDialog → HTML 页面
+        setupUI() → HTML 结构 + CSS 样式
+        loadTargets() → JS fetch /api/targets
+        createTargetItem() → JS 动态创建 <tr> 元素
+        createStatisticsSection() → HTML + JS 动态更新
+        updateStatistics() → JS fetch /api/statistics
+        onRescueButtonClicked() → WebSocket emit "rescue_target"
+
+    数据流程：
+        页面加载 → fetch /api/targets + /api/statistics → 渲染列表
+        救援按钮 → WebSocket "rescue_target" → 后台 SharedData.target_chosen_
+-->
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>目标信息</title>
+    <style>
+        /* ==================================================== */
+        /* 全局 — 复现 Qt QDialog 样式 */
+        /* ==================================================== */
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: "Microsoft YaHei", "Arial", sans-serif;
+            background-color: #f0f0f0;
+            padding: 10px;
+        }
+
+        /* ==================================================== */
+        /* 主布局 [原: mainLayout = QVBoxLayout] */
+        /* ==================================================== */
+        .main-layout {
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            gap: 10px;
+        }
+
+        /* ==================================================== */
+        /* 内容区域 — 左右分栏 [原: QHBoxLayout* contentLayout] */
+        /* ==================================================== */
+        .content-layout {
+            display: flex;
+            flex-direction: row;
+            gap: 15px;
+            flex: 1;
+            min-height: 0;
+        }
+
+        /* ==================================================== */
+        /* 左侧：目标列表 [原: targetListWidget, 占2/3宽度] */
+        /* ==================================================== */
+        .target-list-panel {
+            flex: 2;
+            display: flex;
+            flex-direction: column;
+            background: #fff;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            overflow: hidden;
+        }
+
+        /* 标题 [原: QLabel "目标详细信息" font-size:16px bold] */
+        .panel-title {
+            font-size: 16px;
+            font-weight: bold;
+            padding: 10px;
+            background-color: #f8f8f8;
+            border-bottom: 1px solid #ddd;
+        }
+
+        /* 滚动区域 [原: QScrollArea scrollArea] */
+        .scroll-area {
+            flex: 1;
+            overflow-y: auto;
+            padding: 5px;
+        }
+
+        /* 目标列表表格 */
+        .target-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        .target-table th {
+            background-color: #e8e8e8;
+            padding: 8px;
+            font-size: 14px;
+            text-align: center;
+            border-bottom: 2px solid #ccc;
+        }
+        .target-table td {
+            padding: 6px 8px;
+            font-size: 14px;
+            text-align: center;
+            border-bottom: 1px solid #eee;
+        }
+
+        /* 目标项目行 [原: createTargetItem → itemWidget margin:1px, bg:#f0f0f0] */
+        .target-table tr:nth-child(odd) {
+            background-color: #f9f9f9;
+        }
+
+        /* 救援按钮 [原: onRescueButtonClicked] */
+        .rescue-btn {
+            background-color: #28a745;
+            color: white;
+            border: none;
+            border-radius: 3px;
+            padding: 4px 12px;
+            font-size: 14px;
+            cursor: pointer;
+        }
+        .rescue-btn:hover { background-color: #218838; }
+
+        /* ==================================================== */
+        /* 右侧：统计信息 [原: statisticsWidget, 占1/3宽度] */
+        /* ==================================================== */
+        .statistics-panel {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            background-color: #e8e8e8;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            padding: 15px;
+            align-items: center;
+            gap: 15px;
+        }
+
+        /* 统计标题 [原: QLabel "目标统计" font-size:16px bold centered] */
+        .statistics-title {
+            font-size: 16px;
+            font-weight: bold;
+            text-align: center;
+        }
+
+        /* 统计弹性空间 [原: statisticsLayout->addStretch()] */
+        .statistics-spacer {
+            flex: 1;
+        }
+
+        /* 统计标签 [原: statisticsLabels — font-size:14px, bg:white, border-radius:3px] */
+        .stat-label {
+            font-size: 14px;
+            padding: 8px 15px;
+            background-color: white;
+            border-radius: 3px;
+            text-align: center;
+            width: 100%;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+
+        /* 总计标签 [原: totalLabel — font-size:15px, bold, bg:#d0d0d0] */
+        .stat-total {
+            font-size: 15px;
+            font-weight: bold;
+            padding: 10px 15px;
+            background-color: #d0d0d0;
+            border-radius: 3px;
+            text-align: center;
+            width: 100%;
+        }
+
+        /* ==================================================== */
+        /* 关闭按钮 [原: QPushButton "关闭" → QDialog::accept] */
+        /* ==================================================== */
+        .close-btn {
+            min-height: 40px;
+            font-size: 14px;
+            font-weight: bold;
+            background-color: #007acc;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.15s;
+        }
+        .close-btn:hover { background-color: #005a99; }
+
+        /* 加载中的提示 */
+        .loading-text {
+            text-align: center;
+            color: #999;
+            padding: 30px;
+            font-size: 16px;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="main-layout">
+
+        <!-- ==================================================== -->
+        <!-- 内容区域：左侧目标列表 + 右侧统计 [原: QHBoxLayout] -->
+        <!-- ==================================================== -->
+        <div class="content-layout">
+
+            <!-- 左侧目标列表 [原: targetListWidget → QVBoxLayout] -->
+            <div class="target-list-panel">
+                <div class="panel-title">目标详细信息</div>
+                <div class="scroll-area" id="scrollArea">
+                    <table class="target-table" id="targetTable">
+                        <thead>
+                            <tr>
+                                <!-- nameLabel [原: QLabel target.name] -->
+                                <th>名称</th>
+                                <!-- xLabel [原: QLabel "A: %1"] -->
+                                <th>A坐标</th>
+                                <!-- yLabel [原: QLabel "B: %1"] -->
+                                <th>B坐标</th>
+                                <!-- nLabel [原: QLabel "N: %1"] -->
+                                <th>数量(N)</th>
+                                <!-- 救援按钮 [原: 无(原代码中按钮已删除)] -->
+                                <th>操作</th>
+                            </tr>
+                        </thead>
+                        <tbody id="targetTableBody">
+                            <tr><td colspan="5" class="loading-text">加载中...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- 右侧统计信息 [原: statisticsWidget → QVBoxLayout] -->
+            <div class="statistics-panel" id="statisticsPanel">
+                <div class="statistics-title">目标统计</div>
+                <div class="statistics-spacer"></div>
+                <!-- 动态填充统计标签 -->
+                <div id="statisticsContent" class="loading-text">统计中...</div>
+                <div class="statistics-spacer"></div>
+            </div>
+        </div>
+
+        <!-- ==================================================== -->
+        <!-- 关闭按钮 [原: closeButton → QDialog::accept] -->
+        <!-- ==================================================== -->
+        <button class="close-btn" onclick="window.close()">关闭</button>
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- Socket.IO 客户端库 -->
+    <!-- ============================================================ -->
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+
+    <script>
+        /*
+         * TargetInfo 页面交互逻辑
+         * [原: TargetInfo.cpp — 全部方法]
+         *
+         * setupUI()        → HTML 结构（已在上方定义）
+         * showEvent()      → DOMContentLoaded → loadTargets()
+         * loadTargets()    → fetch /api/targets + /api/statistics
+         * createTargetItem() → 动态创建 <tr> 行
+         * createStatisticsSection() → HTML 结构（已在右侧面板定义）
+         * updateStatistics() → 动态创建统计标签
+         * onRescueButtonClicked() → socket.emit("rescue_target")
+         */
+
+        // ============================================================
+        // 全局变量
+        // ============================================================
+
+        // statisticsLabels : 各类型统计标签的引用 [原: std::map<QString, QLabel*> statisticsLabels]
+        const statisticsLabels = {};
+
+        // ============================================================
+        // 初始化
+        // ============================================================
+        document.addEventListener("DOMContentLoaded", function () {
+            // [原: void TargetInfo::showEvent(QShowEvent *event)]
+            // 页面加载时重新加载数据
+            loadTargets();
+            loadStatistics();
+
+            // 每 2 秒自动刷新统计数据
+            setInterval(loadStatistics, 2000);
+
+            // 建立 WebSocket 连接用于救援目标选择
+            connectTargetInfoSocket();
+        });
+
+        // ============================================================
+        // WebSocket 连接
+        // ============================================================
+        function connectTargetInfoSocket() {
+            const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+            const wsUrl = protocol + "//" + window.location.host;
+            const socket = io(wsUrl, {
+                transports: ["websocket", "polling"]
+            });
+        }
+
+        /**
+         * loadTargets() — 加载并显示目标列表
+         * [原: void TargetInfo::loadTargets()]
+         *
+         * 数据来源：REST API GET /api/targets（SharedData.targets_ 过滤后数据）
+         */
+        function loadTargets() {
+            fetch("/api/targets")
+                .then(function (response) { return response.json(); })
+                .then(function (targets) {
+                    renderTargetList(targets);
+                })
+                .catch(function (error) {
+                    console.error("加载目标列表失败:", error);
+                    document.getElementById("targetTableBody").innerHTML =
+                        '<tr><td colspan="5" class="loading-text">加载失败</td></tr>';
+                });
+        }
+
+        /**
+         * loadStatistics() — 加载统计数据
+         * [原: void TargetInfo::updateStatistics(const std::vector<Target>& targets)]
+         *
+         * 数据来源：REST API GET /api/statistics（各类型目标 n 值总和）
+         */
+        function loadStatistics() {
+            fetch("/api/statistics")
+                .then(function (response) { return response.json(); })
+                .then(function (stats) {
+                    renderStatistics(stats);
+                })
+                .catch(function (error) {
+                    console.error("加载统计失败:", error);
+                });
+        }
+
+        /**
+         * renderTargetList(targets) — 渲染目标列表
+         * [原: for循环调 createTargetItem()]
+         *
+         * 为每个非 NULL 目标创建一行表格。
+         *
+         * 参数：targets : Array [{x, y, name, n, a, b}, ...]
+         */
+        function renderTargetList(targets) {
+            const tbody = document.getElementById("targetTableBody");
+
+            if (!targets || targets.length === 0) {
+                tbody.innerHTML =
+                    '<tr><td colspan="5" class="loading-text">暂无目标信息</td></tr>';
+                return;
+            }
+
+            let html = "";
+            for (let i = 0; i < targets.length; i++) {
+                const t = targets[i];
+                if (t.name === "NULL") continue;
+                // [原: qDebug()<<"name"<<targets[i].name<<"x"<<targets[i].x<<"y"<<targets[i].y]
+                console.log("name", t.name, "x", t.x, "y", t.y);
+                html += createTargetItem(t, i);
+            }
+            tbody.innerHTML = html || '<tr><td colspan="5" class="loading-text">暂无目标信息</td></tr>';
+        }
+
+        /**
+         * createTargetItem(target, index) — 创建单条目标 HTML 行
+         * [原: void TargetInfo::createTargetItem(const Target& target, int index)]
+         *
+         * 生成一行包含名称、A坐标、B坐标、数量(N)、救援按钮的 <tr>。
+         *
+         * 参数：
+         *     target : {name, x, y, a, b, n}  — 目标数据
+         *     index  : int  — 序号
+         * 返回：HTML 字符串
+         */
+        function createTargetItem(target, index) {
+            const name = escapeHtml(target.name);
+            const a = target.a;  // A 坐标 [原: int(target.a)]
+            const b = target.b;  // B 坐标 [原: int(target.b)]
+            const n = target.n;  // N 数量 [原: int(target.n)]
+
+            // [原: QLabel nameLabel, xLabel, yLabel, nLabel + 弹性空间 + 救援按钮]
+            return (
+                '<tr class="target-row">' +
+                    '<td>' + name + '</td>' +
+                    '<td>' + a + '</td>' +
+                    '<td>' + b + '</td>' +
+                    '<td>' + n + '</td>' +
+                    '<td><button class="rescue-btn" onclick="onRescueButtonClicked(' +
+                        JSON.stringify({x: target.x, y: target.y, name: target.name})
+                            .replace(/"/g, '&quot;') +
+                    ')">救援</button></td>' +
+                '</tr>'
+            );
+        }
+
+        /**
+         * renderStatistics(stats) — 渲染统计数据
+         * [原: void TargetInfo::updateStatistics(const std::vector<Target>& targets)]
+         *
+         * 动态创建各类型统计标签和总计标签。
+         *
+         * 参数：stats : {type_counts: {"类型名": 总数}, total: 总计}
+         */
+        function renderStatistics(stats) {
+            const container = document.getElementById("statisticsContent");
+            const typeCounts = stats.type_counts || {};
+            const total = stats.total || 0;
+
+            let html = "";
+
+            // 各类型统计标签 [原: statisticsLabels[pair.first] = countLabel]
+            const typeNames = Object.keys(typeCounts);
+            if (typeNames.length === 0) {
+                html += '<div class="stat-label">暂无数据</div>';
+            } else {
+                for (let i = 0; i < typeNames.length; i++) {
+                    const name = escapeHtml(typeNames[i]);
+                    const count = typeCounts[typeNames[i]];
+                    // [原: QLabel(QString("%1: %2").arg(pair.first).arg(pair.second))]
+                    html += '<div class="stat-label">' + name + ': ' + count + '</div>';
+                }
+            }
+
+            // 总计标签 [原: totalLabel = QLabel("总计: %1")]
+            html += '<div class="stat-total">总计: ' + total + '</div>';
+
+            container.innerHTML = html;
+        }
+
+        /**
+         * onRescueButtonClicked(target) — 救援按钮点击
+         * [原: void TargetInfo::onRescueButtonClicked(const Target& target)]
+         *
+         * 将选中的目标信息通过 WebSocket 发送到后台，
+         * 更新 SharedData.target_chosen_。
+         *
+         * 参数：target : {x: float, y: float, name: str}
+         */
+        function onRescueButtonClicked(target) {
+            const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+            const wsUrl = protocol + "//" + window.location.host;
+            const socket = io(wsUrl, {
+                transports: ["websocket", "polling"],
+                forceNew: true
+            });
+
+            socket.on("connect", function () {
+                // [原: chosenTarget.x = target.x; chosenTarget.y = target.y; chosenTarget.name = target.name]
+                socket.emit("rescue_target", target);
+                socket.disconnect();
+                alert("已选择救援目标: " + target.name);
+            });
+        }
+
+        /**
+         * escapeHtml(text) — HTML 转义辅助函数
+         */
+        function escapeHtml(text) {
+            const div = document.createElement("div");
+            div.textContent = text;
+            return div.innerHTML;
+        }
+    </script>
+
+</body>
+</html>
